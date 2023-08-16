@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "hr-job-cv-matcher"
+version = "0.1.0"
+description = "This project builds a simple UI to match a Job to a CV using an AI model."
+authors = ["Gil Fernandes <gil.fernandes@onepointltd.com>"]
+readme = "README.md"
+packages = [{include = "hr_job_cv_matcher"}]
+
+[tool.poetry.dependencies]
+python = "3.11.4"
+chainlit = "^0.6.2"
+langchain = "^0.0.259"
+openai = "^0.27.8"
+requests = "^2.31.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
