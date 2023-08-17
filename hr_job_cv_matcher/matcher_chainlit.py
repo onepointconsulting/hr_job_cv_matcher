@@ -160,13 +160,10 @@ async def process_job_description_and_candidates(
 ) -> List[CandidateProfile]:
     sources, input_list = extract_sources_input_list(application_doc, cv_documents)
     profile_llm_chain = create_match_profile_chain_pydantic()
-    skill_results = await profile_llm_chain.aapply_and_parse(
-        input_list
-    )
-    education_llm_chain = create_education_chain()
-    education_results = await education_llm_chain.aapply_and_parse(
-        input_list
-    )
+
+    skill_results_msg, skill_results = await process_skills_llm_chain(input_list, profile_llm_chain)
+    education_results = await process_career_llm_chain(input_list)
+
     extracted_profiles: List[CandidateProfile] = []
     if len(sources) == len(skill_results) == len(education_results):
         for source, skill_result, education_result in zip(
@@ -203,6 +200,35 @@ async def process_job_description_and_candidates(
         content=f"The number of sources and results is not the same",
     ).send()
     return None
+
+async def process_career_llm_chain(input_list):
+    
+    education_llm_chain = create_education_chain()
+    education_results_msg = cl.Message(
+        content="",
+        prompt=education_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
+    )
+
+    await education_results_msg.stream_token("Started career extraction. Please wait ...\n\n")
+    education_results = await education_llm_chain.aapply_and_parse(
+        input_list
+    )
+    await education_results_msg.stream_token("Finished career extraction\n\n")
+    await education_results_msg.send()
+    return education_results
+
+async def process_skills_llm_chain(input_list, profile_llm_chain):
+    skill_results_msg = cl.Message(
+        content="",
+        prompt=profile_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
+    )
+    await skill_results_msg.stream_token("Started skill extraction. Please wait ...\n\n")
+    skill_results = await profile_llm_chain.aapply_and_parse(
+        input_list
+    )
+    await skill_results_msg.stream_token("Finished skill extraction\n\n")
+    await skill_results_msg.send()
+    return skill_results_msg,skill_results
 
 
 def extract_sources_input_list(
