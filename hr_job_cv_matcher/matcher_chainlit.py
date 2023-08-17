@@ -38,7 +38,7 @@ KEY_CV_DOCS = "cv_docs"
 @cl.on_chat_start
 async def init():
     await cl.Message(
-        content=f"**May the working force be with you.**",
+        content=f"**May the work-force be with you.**",
     ).send()
     application_docs = await upload_and_extract_text("job description file")
 
