@@ -8,7 +8,7 @@ from hr_job_cv_matcher.model import (
     ScoreWeightsJson,
 )
 from hr_job_cv_matcher.service.candidate_ranking import DEFAULT_WEIGHTS, calculate_score, sort_candidates
-from hr_job_cv_matcher.service.document_matcher import (
+from hr_job_cv_matcher.service.job_description_cv_matcher import (
     MatchSkillsProfile,
     create_input_list,
     create_match_profile_chain_pydantic,
@@ -21,12 +21,12 @@ from langchain.schema import Document
 from typing import List, Dict, Tuple, Optional
 
 import chainlit as cl
-from chainlit.input_widget import Slider
+from chainlit.input_widget import Slider, TextInput
 
 from hr_job_cv_matcher.document_factory import convert_to_doc
 
 from hr_job_cv_matcher.log_init import logger
-from hr_job_cv_matcher.config import cfg
+from hr_job_cv_matcher.config import cfg, prompt_cfg
 
 TIMEOUT = 1200
 LLM_AUTHOR = "LLM"
@@ -77,7 +77,8 @@ async def setup_agent(settings):
     application_docs = cl.user_session.get(KEY_APPLICATION_DOCS)
     cvs_docs = cl.user_session.get(KEY_CV_DOCS)
     logger.info("application_docs: %s", len(application_docs))
-    score_weights = ScoreWeightsJson.factory(settings=settings)
+    score_weights = ScoreWeightsJson.factory(settings)
+    prompt_cfg.update_prompt(settings)
     candidate_profiles: List[CandidateProfile] = await process_applications_and_cvs(
         application_docs, cvs_docs, score_weights
     )
@@ -418,6 +419,7 @@ async def display_scoring_sliders(
                 max=4,
                 step=0.1,
             ),
+            TextInput(id="prompt_extra_skills_examples", label="Prompt extra skills examples (comma-separated)", initial=""),
         ]
     )
     res: Optional[dict] = None

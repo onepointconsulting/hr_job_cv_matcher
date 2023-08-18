@@ -27,6 +27,21 @@ class Config:
 
 cfg = Config()
 
+class PromptConfig:
+    extra_skills = ""
+
+    def update_prompt(self, settings):
+        prompt_extra_skills_examples = settings['prompt_extra_skills_examples']
+        if len(prompt_extra_skills_examples) > 0:
+            splits = prompt_extra_skills_examples.split(",")
+            output = ""
+            for split in splits:
+                output += f"\n-{split.strip()}"
+            self.extra_skills = output
+
+
+prompt_cfg = PromptConfig()
+
 if __name__ == "__main__":
     logger.info("Model: %s", cfg.model)
     logger.info("Remote_pdf_server: %s", cfg.remote_pdf_server)

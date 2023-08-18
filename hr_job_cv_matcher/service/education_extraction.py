@@ -8,7 +8,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain import LLMChain
 from langchain.chains.openai_functions import create_structured_output_chain
 
-from hr_job_cv_matcher.service.document_matcher import (
+from hr_job_cv_matcher.service.job_description_cv_matcher import (
     JOB_DESCRIPTION_START,
     JOB_DESCRIPTION_END,
     CV_START,
