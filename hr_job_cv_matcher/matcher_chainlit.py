@@ -17,6 +17,7 @@ from hr_job_cv_matcher.service.job_description_cv_matcher import (
 from hr_job_cv_matcher.service.education_extraction import (
     create_education_chain,
 )
+from hr_job_cv_matcher.service.social_skills_extractor import create_social_profile_chain, extract_social_skills
 from langchain import LLMChain
 from langchain.schema import Document
 from typing import List, Dict, Tuple, Optional
@@ -177,8 +178,10 @@ async def process_job_description_and_candidates(
 ) -> List[CandidateProfile]:
     sources, input_list = extract_sources_input_list(application_doc, cv_documents)
     profile_llm_chain = create_match_profile_chain_pydantic()
+    social_profile_llm_chain = create_social_profile_chain()
 
     _, skill_results = await process_skills_llm_chain(input_list, profile_llm_chain, sources)
+    _, social_skill_results = await process_social_skills_llm_chain(input_list, social_profile_llm_chain, sources)
     education_results = await process_career_llm_chain(input_list, sources)
 
     extracted_profiles: List[CandidateProfile] = []
@@ -186,8 +189,10 @@ async def process_job_description_and_candidates(
     for source in skill_results.keys():
         skill_result = skill_results[source]
         education_result = education_results[source]
+        social_skill_result = social_skill_results[source]
         match_skills_profile = None
 
+        # Process skills
         if "function" in skill_result:
             match_skills_profile: MatchSkillsProfile = skill_result["function"]
         elif isinstance(skill_result, MatchSkillsProfile):
@@ -195,8 +200,12 @@ async def process_job_description_and_candidates(
             match_skills_profile: MatchSkillsProfile = skill_result
         if match_skills_profile is None:
             continue
-        
+
         logger.info("Matching skills: %a", match_skills_profile)
+        
+        # Process social skills
+        social_kills = extract_social_skills(social_skill_result)
+        
         # Process career
         education_career_dict = None
         if 'function' in education_result:
@@ -219,7 +228,7 @@ async def process_job_description_and_candidates(
                 matched_skills_profile=MatchSkillsProfileJson(
                     matching_skills=match_skills_profile.matching_skills,
                     missing_skills=match_skills_profile.missing_skills,
-                    social_skills=match_skills_profile.social_skills,
+                    social_skills=social_kills,
                 ),
                 education_career_profile=education_career_json,
                 score=0,
@@ -254,20 +263,32 @@ async def process_career_llm_chain(input_list, sources) -> dict:
     return education_results
 
 
-async def process_skills_llm_chain(input_list, profile_llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
-    skill_results_msg = cl.Message(
+
+
+
+async def process_generic_extraction(input_list: List[str], llm_chain: LLMChain, sources: List[str], parameters: dict, task_name: str) -> Tuple[cl.Message, dict]:
+    results_msg = cl.Message(
         content="",
-        prompt=profile_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
+        prompt=llm_chain.prompt.format(**parameters)
     )
-    await skill_results_msg.stream_token("Started skill extraction. Please wait ...\n\n")
-    skill_results = {}
+    await results_msg.stream_token(f"Started {task_name} extraction. Please wait ...\n\n")
+    results = {}
     for input, source in zip(input_list, sources):
         source_name = source.name
-        await skill_results_msg.stream_token(f"Processing {source_name}.\n\n")
-        skill_results[source] = await profile_llm_chain.arun(input)
-    await skill_results_msg.stream_token("Finished skill extraction.\n\n")
-    await skill_results_msg.send()
-    return skill_results_msg, skill_results
+        await results_msg.stream_token(f"Processing {source_name}.\n\n")
+        logger.info("Chain input for %s: %s", task_name, input.keys())
+        results[source] = await llm_chain.arun(input)
+    await results_msg.stream_token(f"Finished {task_name} extraction.\n\n")
+    await results_msg.send()
+    return results_msg, results
+
+
+async def process_skills_llm_chain(input_list: List[str], profile_llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
+    return await process_generic_extraction(input_list, profile_llm_chain, sources, {'job_description': "'job description'", 'cv':"'CV'"}, 'skill')
+
+
+async def process_social_skills_llm_chain(input_list: List[str], llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
+    return await process_generic_extraction(input_list, llm_chain, sources, {'cv':"'CV'"}, 'social skill')
 
 
 def extract_sources_input_list(

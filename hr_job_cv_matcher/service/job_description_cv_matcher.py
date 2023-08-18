@@ -96,15 +96,9 @@ json_schema_match_skills = {
             "description": "The list of skills that are in the job description, but not matched in the job profile.",
             "type": "array",
             "items": {"type": "string"},
-        },
-        "social_skills": {
-            "title": "Social skills list",
-            "description": "A list of skills which are mentioned in the candidate CV only.",
-            "type": "array",
-            "items": {"type": "string"},
         }
     },
-    "required": ["matching_skills", "missing_skills", "social_skills"],
+    "required": ["matching_skills", "missing_skills"],
 }
 
 
@@ -139,14 +133,12 @@ def create_zero_shot_matching_prompt() -> ChatPromptTemplate:
     return prompt_factory(system_message, [human_message_1, HUMAN_MESSAGE_JD, HUMAN_MESSAGE_CV, TIPS_PROMPT])
 
 
-
 def create_match_profile_chain_pydantic() -> LLMChain:
     return create_structured_output_chain(MatchSkillsProfile, cfg.llm, create_zero_shot_matching_prompt(), verbose=cfg.verbose_llm)
 
 
 def create_match_profile_chain() -> LLMChain:
     return create_structured_output_chain(json_schema_match_skills, cfg.llm, create_zero_shot_matching_prompt(), verbose=cfg.verbose_llm)
-
 
 
 def create_input_list(job_description, cvs):
