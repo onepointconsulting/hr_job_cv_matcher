@@ -8,6 +8,7 @@ from hr_job_cv_matcher.model import (
     ScoreWeightsJson,
 )
 from hr_job_cv_matcher.service.candidate_ranking import DEFAULT_WEIGHTS, calculate_score, sort_candidates
+from hr_job_cv_matcher.service.chart_generator import generate_chart
 from hr_job_cv_matcher.service.job_description_cv_matcher import (
     MatchSkillsProfile,
     create_input_list,
@@ -94,7 +95,18 @@ async def render_ranking(sorted_candidate_profiles: List[CandidateProfile]):
     for i, profile in enumerate(sorted_candidate_profiles):
         path = Path(profile.source)
         ranking_message += f"\n{i + 1}. {path.name}: **{profile.score}** points"
-    await cl.Message(content=ranking_message, indent=0).send()
+
+    barchart_image = generate_chart(sorted_candidate_profiles)
+    elements = [
+        cl.Image(
+            name="ranking_image1",
+            display="inline",
+            path=str(barchart_image.absolute()),
+            size="large",
+        )
+    ]
+    
+    await cl.Message(content=ranking_message, indent=0, elements=elements).send()
 
 
 
