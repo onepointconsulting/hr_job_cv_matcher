@@ -16,11 +16,12 @@ from hr_job_cv_matcher.service.document_matcher import (
 from hr_job_cv_matcher.service.education_extraction import (
     create_education_chain,
 )
+from langchain import LLMChain
 from langchain.schema import Document
 from typing import List, Dict, Tuple, Optional
 
 import chainlit as cl
-from chainlit.input_widget import Slider, Select, Switch
+from chainlit.input_widget import Slider
 
 from hr_job_cv_matcher.document_factory import convert_to_doc
 
@@ -121,6 +122,7 @@ async def process_applications_and_cvs(
     ] = await process_job_description_and_candidates(application_docs[0], cvs_docs)
     scored_profiles = []
     if len(candidate_profiles) > 0:
+        logger.warn("%d profiles extracted", len(candidate_profiles))
         for profile in candidate_profiles:
             skills = profile.matched_skills_profile
             education_career_profile = profile.education_career_profile
@@ -129,6 +131,8 @@ async def process_applications_and_cvs(
                 profile.score = score
                 profile.breakdown = breakdown
                 scored_profiles.append(profile)
+    else:
+        logger.warn("No profiles extracted")
     return candidate_profiles
 
 
@@ -161,74 +165,96 @@ async def process_job_description_and_candidates(
     sources, input_list = extract_sources_input_list(application_doc, cv_documents)
     profile_llm_chain = create_match_profile_chain_pydantic()
 
-    skill_results_msg, skill_results = await process_skills_llm_chain(input_list, profile_llm_chain)
-    education_results = await process_career_llm_chain(input_list)
+    _, skill_results = await process_skills_llm_chain(input_list, profile_llm_chain, sources)
+    education_results = await process_career_llm_chain(input_list, sources)
 
     extracted_profiles: List[CandidateProfile] = []
-    if len(sources) == len(skill_results) == len(education_results):
-        for source, skill_result, education_result in zip(
-            sources, skill_results, education_results
-        ):
-            if "function" in skill_result:
-                match_skills_profile: MatchSkillsProfile = skill_result["function"]
-                logger.info("Matching skills: %a", match_skills_profile)
-                # Process jobs
-                education_career_dict: dict = education_result["function"]
-                logger.info("Matching education: %a", education_career_dict)
-                education_career_json = EducationCareerJson(
-                    relevant_degree_list=education_career_dict["relevant_degree_list"],
-                    relevant_job_list=education_career_dict["relevant_job_list"],
-                    years_of_experience=education_career_dict["years_of_experience"],
-                )
-                extracted_profiles.append(
-                    CandidateProfile(
-                        source=source,
-                        document=application_doc,
-                        matched_skills_profile=MatchSkillsProfileJson(
-                            matching_skills=match_skills_profile.matching_skills,
-                            missing_skills=match_skills_profile.missing_skills,
-                            social_skills=match_skills_profile.social_skills,
-                            suitability_score=match_skills_profile.suitability_score,
-                        ),
-                        education_career_profile=education_career_json,
-                        score=0,
-                        breakdown="",
-                    )
-                )
-        return extracted_profiles
-    await cl.ErrorMessage(
-        content=f"The number of sources and results is not the same",
-    ).send()
-    return None
 
-async def process_career_llm_chain(input_list):
+    for source in skill_results.keys():
+        skill_result = skill_results[source]
+        education_result = education_results[source]
+        match_skills_profile = None
+
+        if "function" in skill_result:
+            match_skills_profile: MatchSkillsProfile = skill_result["function"]
+        elif isinstance(skill_result, MatchSkillsProfile):
+            logger.info("skill_result is MatchSkillsProfile: %s", skill_result)
+            match_skills_profile: MatchSkillsProfile = skill_result
+        if match_skills_profile is None:
+            continue
+        
+        logger.info("Matching skills: %a", match_skills_profile)
+        # Process career
+        education_career_dict = None
+        if 'function' in education_result:
+            education_career_dict: dict = education_result["function"]
+        elif 'relevant_job_list' in education_result:
+            education_career_dict: dict = education_result
+        if education_career_dict is None:
+            continue
+
+        logger.info("Matching education: %a", education_career_dict)
+        education_career_json = EducationCareerJson(
+            relevant_degree_list=education_career_dict["relevant_degree_list"],
+            relevant_job_list=education_career_dict["relevant_job_list"],
+            years_of_experience=education_career_dict["years_of_experience"],
+        )
+        extracted_profiles.append(
+            CandidateProfile(
+                source=source,
+                document=application_doc,
+                matched_skills_profile=MatchSkillsProfileJson(
+                    matching_skills=match_skills_profile.matching_skills,
+                    missing_skills=match_skills_profile.missing_skills,
+                    social_skills=match_skills_profile.social_skills,
+                ),
+                education_career_profile=education_career_json,
+                score=0,
+                breakdown="",
+            )
+        )
+
+
+    if not (len(sources) == len(skill_results) == len(education_results)):
+        await cl.ErrorMessage(
+            content=f"The number of sources {len(sources)} and results (skills: {len(skill_results)}, education: {len(education_results)}) is not the same",
+        ).send()
+    return extracted_profiles
+
+async def process_career_llm_chain(input_list, sources) -> dict:
     
     education_llm_chain = create_education_chain()
     education_results_msg = cl.Message(
         content="",
         prompt=education_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
     )
-
     await education_results_msg.stream_token("Started career extraction. Please wait ...\n\n")
-    education_results = await education_llm_chain.aapply_and_parse(
-        input_list
-    )
+    education_results = {}
+    for input, source in zip(input_list, sources):
+        source_name = source.name
+        await education_results_msg.stream_token(f"Processing {source_name}.\n\n")
+        education_results[source] = await education_llm_chain.arun(
+            input
+        )
     await education_results_msg.stream_token("Finished career extraction\n\n")
     await education_results_msg.send()
     return education_results
 
-async def process_skills_llm_chain(input_list, profile_llm_chain):
+
+async def process_skills_llm_chain(input_list, profile_llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
     skill_results_msg = cl.Message(
         content="",
         prompt=profile_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
     )
     await skill_results_msg.stream_token("Started skill extraction. Please wait ...\n\n")
-    skill_results = await profile_llm_chain.aapply_and_parse(
-        input_list
-    )
-    await skill_results_msg.stream_token("Finished skill extraction\n\n")
+    skill_results = {}
+    for input, source in zip(input_list, sources):
+        source_name = source.name
+        await skill_results_msg.stream_token(f"Processing {source_name}.\n\n")
+        skill_results[source] = await profile_llm_chain.arun(input)
+    await skill_results_msg.stream_token("Finished skill extraction.\n\n")
     await skill_results_msg.send()
-    return skill_results_msg,skill_results
+    return skill_results_msg, skill_results
 
 
 def extract_sources_input_list(

@@ -14,19 +14,16 @@ class MatchSkillsProfileJson(dict):
     matching_skills: List[str]
     missing_skills: List[str]
     social_skills: List[str]
-    suitability_score: int
 
-    def __init__(self, matching_skills: List[str], missing_skills: List[str], social_skills: List[str], suitability_score: int) -> None:
+    def __init__(self, matching_skills: List[str], missing_skills: List[str], social_skills: List[str]) -> None:
         self.matching_skills = matching_skills
         self.missing_skills = missing_skills
         self.social_skills = social_skills
-        self.suitability_score = suitability_score
         dict.__init__(
             self,
             matching_skills=self.matching_skills,
             missing_skills=self.missing_skills,
             social_skills=self.social_skills,
-            suitability_score=self.suitability_score,
         )
 
     @classmethod
@@ -36,8 +33,7 @@ class MatchSkillsProfileJson(dict):
             matching_skills = content['matching_skills']
             missing_skills = content['missing_skills']
             social_skills = content['social_skills']
-            suitability_score = content['suitability_score']
-            return cls(matching_skills, missing_skills, social_skills, suitability_score)
+            return cls(matching_skills, missing_skills, social_skills)
         logger.warn("Cannot parse dict: %s", result)
         return None
 
@@ -128,13 +124,11 @@ if __name__ == "__main__":
         matching_skills=["test"],
         missing_skills=["test1"],
         social_skills=["test_social"],
-        suitability_score=10,
     )
     match_skills = MatchSkillsProfileJson(
         matching_skills=match_skills_profile.matching_skills, 
         missing_skills=match_skills_profile.missing_skills,
-        social_skills=match_skills_profile.social_skills,
-        suitability_score=match_skills_profile.suitability_score
+        social_skills=match_skills_profile.social_skills
     )
     print(json.dumps(match_skills))
     education_career = EducationCareerJson(

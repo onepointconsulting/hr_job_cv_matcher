@@ -40,7 +40,6 @@ class MatchSkillsProfile(BaseModel):
     matching_skills: List[str] = Field(..., description="The list of skills of the candidate which matched the skills in the job description.")
     missing_skills: List[str] = Field(..., description="The list of skills that are in the job description, but not matched in the job profile.")
     social_skills: List[str] = Field(..., description="A list of skills which are mentioned in the candidate CV only.")
-    suitability_score: int = Field(..., description="A number from 1 and 100 (including 1 and 100) which represents the candidate suitability against the job description")
 
 
 json_schema_match_skills = {
@@ -65,14 +64,9 @@ json_schema_match_skills = {
             "description": "A list of skills which are mentioned in the candidate CV only.",
             "type": "array",
             "items": {"type": "string"},
-        },
-        "suitability_score": {
-            "title": "Suitability score",
-            "description": "A number from 1 and 100 (including 1 and 100) which represents the candidate suitability against the job description.",
-            "type": "integer"
         }
     },
-    "required": ["matching_skills", "missing_skills", "social_skills", "suitability_score"],
+    "required": ["matching_skills", "missing_skills", "social_skills"],
 }
 
 
@@ -107,11 +101,11 @@ def create_zero_shot_matching_prompt() -> ChatPromptTemplate:
 
 
 def create_match_profile_chain_pydantic() -> LLMChain:
-    return create_structured_output_chain(MatchSkillsProfile, cfg.llm, create_zero_shot_matching_prompt(), verbose=True)
+    return create_structured_output_chain(MatchSkillsProfile, cfg.llm, create_zero_shot_matching_prompt(), verbose=cfg.verbose_llm)
 
 
 def create_match_profile_chain() -> LLMChain:
-    return create_structured_output_chain(json_schema_match_skills, cfg.llm, create_zero_shot_matching_prompt(), verbose=True)
+    return create_structured_output_chain(json_schema_match_skills, cfg.llm, create_zero_shot_matching_prompt(), verbose=cfg.verbose_llm)
 
 
 

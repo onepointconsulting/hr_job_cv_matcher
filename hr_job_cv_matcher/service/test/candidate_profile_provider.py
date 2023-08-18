@@ -12,8 +12,7 @@ def create_candidate_profile() -> CandidateProfile:
         matched_skills_profile=MatchSkillsProfileJson(
             matching_skills=["Wordpress", "PHP", "HTML"],
             missing_skills=["Javascript", "Phigma"],
-            social_skills=["Managing teams"],
-            suitability_score=-1
+            social_skills=["Managing teams"]
         ),
         education_career_profile=EducationCareerJson(
             relevant_job_list=["Front End Developer", "Wordpress Administrator"],
