@@ -18,12 +18,13 @@ from hr_job_cv_matcher.service.education_extraction import (
     create_education_chain,
 )
 from hr_job_cv_matcher.service.social_skills_extractor import create_social_profile_chain, extract_social_skills
+from hr_job_cv_matcher.ui.chat_settings import create_chat_settings
+from hr_job_cv_matcher.ui.messages import display_uploaded_job_description, render_barchart_image
 from langchain import LLMChain
 from langchain.schema import Document
 from typing import List, Dict, Tuple, Optional
 
 import chainlit as cl
-from chainlit.input_widget import Slider, TextInput
 
 from hr_job_cv_matcher.document_factory import convert_to_doc
 
@@ -43,25 +44,13 @@ async def init():
     await cl.Message(
         content=f"**May the work-force be with you.**",
     ).send()
-    application_docs = await upload_and_extract_text("job description file")
+    application_docs = await upload_and_extract_text("job description files", max_files=cfg.max_jd_files)
 
     if application_docs is not None and len(application_docs) > 0:
-        application_path = Path(application_docs[0].metadata["source"])
-        elements = [
-            cl.Pdf(
-                name=application_path.name,
-                display="inline",
-                path=str(application_path.absolute()),
-            )
-        ]
-        await cl.Message(
-            content=f"Job description processed: {application_path.name}",
-            elements=elements,
-        ).send()
 
-        cvs_docs = await upload_and_extract_text("CV files", max_files=cfg.max_cv_files)
-        if cvs_docs is not None and len(cvs_docs) > 0:
-            await display_scoring_sliders(application_docs, cvs_docs)
+        cv_docs = await upload_and_extract_text("CV files", max_files=cfg.max_cv_files)
+        if application_docs and cv_docs:
+            await start_process_applications_and_cvs(application_docs, cv_docs)
 
         else:
             await cl.ErrorMessage(
@@ -74,40 +63,39 @@ async def init():
 
 
 @cl.on_settings_update
-async def setup_agent(settings):
+async def process_with_settings(settings):
     logger.info("Settings: %s", settings)
-    application_docs = cl.user_session.get(KEY_APPLICATION_DOCS)
+    application_docs: List[Document] = cl.user_session.get(KEY_APPLICATION_DOCS)
     cvs_docs = cl.user_session.get(KEY_CV_DOCS)
+    source_document_dict: Dict[str, Document] = {Path(doc.metadata['source']).name: doc for doc in application_docs}
     logger.info("application_docs: %s", len(application_docs))
     score_weights = ScoreWeightsJson.factory(settings)
     prompt_cfg.update_prompt(settings)
-    candidate_profiles: List[CandidateProfile] = await process_applications_and_cvs(
+    candidate_profiles_dict: Dict[str, List[CandidateProfile]] = await process_applications_and_cvs(
         application_docs, cvs_docs, score_weights
     )
-    sorted_candidate_profiles: List[CandidateProfile] = sort_candidates(candidate_profiles)
-    await render_ranking(sorted_candidate_profiles)
-    breakdown_msg_id = await cl.Message(content=f"### Breakdown").send()
-    await render_breakdown(sorted_candidate_profiles, breakdown_msg_id)
+    sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]] = await asyncify(sort_candidates)(candidate_profiles_dict)
+    await render_ranking(sorted_candidate_profiles_dict, source_document_dict)
 
 
 
-async def render_ranking(sorted_candidate_profiles: List[CandidateProfile]):
-    ranking_message = "## Ranking"
-    for i, profile in enumerate(sorted_candidate_profiles):
-        path = Path(profile.source)
-        ranking_message += f"\n{i + 1}. {path.name}: **{profile.score}** points"
-
-    barchart_image = generate_chart(sorted_candidate_profiles)
-    elements = [
-        cl.Image(
-            name="ranking_image1",
-            display="inline",
-            path=str(barchart_image.absolute()),
-            size="large",
-        )
-    ]
+async def render_ranking(
+        sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]],
+        source_document_dict: Dict[str, Document]
+    ):
     
-    await cl.Message(content=ranking_message, indent=0, elements=elements).send()
+    for jd_source, sorted_candidate_profiles in sorted_candidate_profiles_dict.items():
+        doc = source_document_dict[jd_source]
+        await display_uploaded_job_description(doc)
+        ranking_message = "## Ranking"
+        for i, profile in enumerate(sorted_candidate_profiles):
+            path = Path(profile.source)
+            ranking_message += f"\n{i + 1}. {path.name}: **{profile.score}** points"
+
+        await render_barchart_image(ranking_message, sorted_candidate_profiles)
+
+        breakdown_msg_id = await cl.Message(content=f"### Breakdown").send()
+        await render_breakdown(sorted_candidate_profiles, breakdown_msg_id)
 
 
 
@@ -129,25 +117,28 @@ async def process_applications_and_cvs(
     application_docs: List[Document],
     cvs_docs: List[Document],
     score_weights: ScoreWeightsJson,
-) -> List[CandidateProfile]:
+) -> Dict[str,List[CandidateProfile]]:
     await cl.Message(content=f"{len(cvs_docs)} CV(s) uploaded.").send()
-    candidate_profiles: List[
-        CandidateProfile
-    ] = await process_job_description_and_candidates(application_docs[0], cvs_docs)
-    scored_profiles = []
-    if len(candidate_profiles) > 0:
-        logger.warn("%d profiles extracted", len(candidate_profiles))
-        for profile in candidate_profiles:
-            skills = profile.matched_skills_profile
-            education_career_profile = profile.education_career_profile
-            if skills and education_career_profile:
-                score, breakdown = calculate_score(profile, score_weights)
-                profile.score = score
-                profile.breakdown = breakdown
-                scored_profiles.append(profile)
-    else:
-        logger.warn("No profiles extracted")
-    return candidate_profiles
+    jd_cv_result_matrix = {}
+    for current_application_doc in application_docs:
+        candidate_profiles: List[
+            CandidateProfile
+        ] = await process_job_description_and_candidates(current_application_doc, cvs_docs)
+        scored_profiles = []
+        if len(candidate_profiles) > 0:
+            logger.warn("%d profiles extracted", len(candidate_profiles))
+            for profile in candidate_profiles:
+                skills = profile.matched_skills_profile
+                education_career_profile = profile.education_career_profile
+                if skills and education_career_profile:
+                    score, breakdown = calculate_score(profile, score_weights)
+                    profile.score = score
+                    profile.breakdown = breakdown
+                    scored_profiles.append(profile)
+        else:
+            logger.warn("No profiles extracted")
+        jd_cv_result_matrix[Path(current_application_doc.metadata['source']).name] = candidate_profiles
+    return jd_cv_result_matrix
 
 
 async def upload_and_extract_text(
@@ -157,7 +148,7 @@ async def upload_and_extract_text(
     application_docs: List[Document] = []
     while files is None:
         files = await cl.AskFileMessage(
-            content=f"Please upload a {item_to_upload}!",
+            content=f"Please upload {item_to_upload}!",
             accept=["application/pdf"],
             max_files=max_files,
             timeout=TIMEOUT,
@@ -236,7 +227,6 @@ async def process_job_description_and_candidates(
             )
         )
 
-
     if not (len(sources) == len(skill_results) == len(education_results)):
         await cl.ErrorMessage(
             content=f"The number of sources {len(sources)} and results (skills: {len(skill_results)}, education: {len(education_results)}) is not the same",
@@ -261,9 +251,6 @@ async def process_career_llm_chain(input_list, sources) -> dict:
     await education_results_msg.stream_token("Finished career extraction\n\n")
     await education_results_msg.send()
     return education_results
-
-
-
 
 
 async def process_generic_extraction(input_list: List[str], llm_chain: LLMChain, sources: List[str], parameters: dict, task_name: str) -> Tuple[cl.Message, dict]:
@@ -397,72 +384,23 @@ def render_skills_str(title: str, skills: List[Dict]) -> str:
 
 
 
-async def display_scoring_sliders(
+async def start_process_applications_and_cvs(
     application_docs: List[Document], cvs_docs: List[Document]
 ):
     cl.user_session.set(KEY_APPLICATION_DOCS, application_docs)
     cl.user_session.set(KEY_CV_DOCS, cvs_docs)
-    chat_settings = cl.ChatSettings(
-        [
-            Slider(
-                id="matching_skills_weight",
-                label="Matching skills weight",
-                initial=DEFAULT_WEIGHTS.matching_skills_weight,
-                min=0,
-                max=4,
-                step=0.1,
-            ),
-            Slider(
-                id="missing_skills_weight",
-                label="Missing skills weight",
-                initial=DEFAULT_WEIGHTS.missing_skills_weight,
-                min=-2,
-                max=0,
-                step=0.1,
-            ),
-            Slider(
-                id="social_skills_weight",
-                label="Social skills weight",
-                initial=DEFAULT_WEIGHTS.social_skills_weight,
-                min=0,
-                max=4,
-                step=0.1,
-            ),
-            Slider(
-                id="relevant_job_list_weight",
-                label="Relevant Job list weight",
-                initial=DEFAULT_WEIGHTS.relevant_job_list_weight,
-                min=0,
-                max=4,
-                step=0.1,
-            ),
-            Slider(
-                id="relevant_degree_list_weight",
-                label="Relevant degree list weight",
-                initial=DEFAULT_WEIGHTS.relevant_degree_list_weight,
-                min=0,
-                max=4,
-                step=0.1,
-            ),
-            Slider(
-                id="years_of_experience_weight",
-                label="Years of experience weight",
-                initial=DEFAULT_WEIGHTS.years_of_experience_weight,
-                min=0,
-                max=4,
-                step=0.1,
-            ),
-            TextInput(id="prompt_extra_skills_examples", label="Prompt extra skills examples (comma-separated)", initial=""),
-        ]
-    )
+    chat_settings = create_chat_settings()
     res: Optional[dict] = None
     settings = None
     while True:
         res = await cl.AskUserMessage(
-            content="Now you can change the weights via the settings button. Please type 'ok' to proceed.",
+            content="Now you can change the weights via the settings button. Please type 'ok' to process all applications and CVs.",
             timeout=TIMEOUT,
         ).send()
         if res is not None and "ok" in res["content"].lower():
             settings = await chat_settings.send()
             break
-    await setup_agent(settings)
+    await process_with_settings(settings)
+
+
+

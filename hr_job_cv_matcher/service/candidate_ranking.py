@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 from hr_job_cv_matcher.model import CandidateProfile, ScoreWeightsJson
 from hr_job_cv_matcher.service.test.candidate_profile_provider import create_candidate_profile
@@ -33,8 +33,11 @@ def calculate_score(candidate_profile: CandidateProfile, weights: ScoreWeightsJs
     return (score, breakdown)
 
 
-def sort_candidates(candidate_profiles: List[CandidateProfile]) -> List[CandidateProfile]:
-    return sorted(candidate_profiles, key=lambda x: x.score, reverse=True)
+def sort_candidates(candidate_profiles: Dict[str, List[CandidateProfile]]) -> Dict[str, List[CandidateProfile]]:
+    candidate_profile_sorted = {}
+    for k, cvs in candidate_profiles.items():
+        candidate_profile_sorted[k] = sorted(cvs, key=lambda x: x.score, reverse=True)
+    return candidate_profile_sorted
 
 
 if __name__ == "__main__":

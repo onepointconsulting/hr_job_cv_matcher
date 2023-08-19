@@ -27,6 +27,7 @@ class Config:
     remote_pdf_server = os.getenv("REMOTE_PDF_SERVER")
     temp_doc_location = Path(os.getenv("TEMP_DOC_LOCATION"))
     create_if_not_exists(temp_doc_location)
+    max_jd_files = os.getenv("MAX_JD_FILES") or 10
     max_cv_files = os.getenv("MAX_CV_FILES") or 10
     verbose_llm = os.getenv("VERBOSE_LLM") == "true"
 

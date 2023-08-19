@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from hr_job_cv_matcher.model import CandidateProfile
 from hr_job_cv_matcher.config import cfg
 
+
 def generate_chart(sorted_candidate_profiles: List[CandidateProfile]) -> str:
 
     # Extract names and scores

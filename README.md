@@ -19,5 +19,5 @@ poetry install
 ## Running
 
 ```
-chainlit run ./hr_job_cv_matcher/matcher_chainlit.py --port 8087
+chainlit run ./hr_job_cv_matcher/ui/matcher_chainlit.py --port 8087
 ```
