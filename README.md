@@ -2,6 +2,12 @@
 
 This project builds a simple UI to match a Job to a CV using an AI model.
 
+It allows a user to upload a set of job applications and a set of CVs and then it will rank them according to the matching skills specified in
+the job description. It will end up creating a sort of ranking matrix matching job description to CVs with the best candidates for a specific 
+job description.
+
+This project works best with ChatGPT 4 that can extract at the time of this writing the most accurate matching / missing skills.
+
 ## Setup
 
 ```
