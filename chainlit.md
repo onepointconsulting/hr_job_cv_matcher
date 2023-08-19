@@ -1,8 +1,8 @@
-# Welcome to AIshu! 🚀🤖
+# Welcome to HR Job Application CV Matching Assistant! 🚀🤖
 
 ## HR Job CV Assistant
 
-AIshu is here to help you to match candidates to a job application and rank the CVs! 
+The "HR Job Application CV Matching Assistant" is here to help you to match candidates to multiple job applications and rank the CVs! 
 👋 We're excited to have you on board!
 
 ## Useful Links 🔗
