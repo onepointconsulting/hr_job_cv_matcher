@@ -7,7 +7,11 @@ from hr_job_cv_matcher.model import (
     MatchSkillsProfileJson,
     ScoreWeightsJson,
 )
-from hr_job_cv_matcher.service.candidate_ranking import DEFAULT_WEIGHTS, calculate_score, sort_candidates
+from hr_job_cv_matcher.service.candidate_ranking import (
+    DEFAULT_WEIGHTS,
+    calculate_score,
+    sort_candidates,
+)
 from hr_job_cv_matcher.service.chart_generator import generate_chart
 from hr_job_cv_matcher.service.job_description_cv_matcher import (
     MatchSkillsProfile,
@@ -17,9 +21,15 @@ from hr_job_cv_matcher.service.job_description_cv_matcher import (
 from hr_job_cv_matcher.service.education_extraction import (
     create_education_chain,
 )
-from hr_job_cv_matcher.service.social_skills_extractor import create_social_profile_chain, extract_social_skills
+from hr_job_cv_matcher.service.social_skills_extractor import (
+    create_social_profile_chain,
+    extract_social_skills,
+)
 from hr_job_cv_matcher.ui.chat_settings import create_chat_settings
-from hr_job_cv_matcher.ui.messages import display_uploaded_job_description, render_barchart_image
+from hr_job_cv_matcher.ui.messages import (
+    display_uploaded_job_description,
+    render_barchart_image,
+)
 from langchain import LLMChain
 from langchain.schema import Document
 from typing import List, Dict, Tuple, Optional
@@ -44,10 +54,11 @@ async def init():
     await cl.Message(
         content=f"**May the work-force be with you.**",
     ).send()
-    application_docs = await upload_and_extract_text("job description files", max_files=cfg.max_jd_files)
+    application_docs = await upload_and_extract_text(
+        "job description files", max_files=cfg.max_jd_files
+    )
 
     if application_docs is not None and len(application_docs) > 0:
-
         cv_docs = await upload_and_extract_text("CV files", max_files=cfg.max_cv_files)
         if application_docs and cv_docs:
             await start_process_applications_and_cvs(application_docs, cv_docs)
@@ -67,23 +78,25 @@ async def process_with_settings(settings):
     logger.info("Settings: %s", settings)
     application_docs: List[Document] = cl.user_session.get(KEY_APPLICATION_DOCS)
     cvs_docs = cl.user_session.get(KEY_CV_DOCS)
-    source_document_dict: Dict[str, Document] = {Path(doc.metadata['source']).name: doc for doc in application_docs}
+    source_document_dict: Dict[str, Document] = {
+        Path(doc.metadata["source"]).name: doc for doc in application_docs
+    }
     logger.info("application_docs: %s", len(application_docs))
     score_weights = ScoreWeightsJson.factory(settings)
     prompt_cfg.update_prompt(settings)
-    candidate_profiles_dict: Dict[str, List[CandidateProfile]] = await process_applications_and_cvs(
-        application_docs, cvs_docs, score_weights
-    )
-    sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]] = await asyncify(sort_candidates)(candidate_profiles_dict)
+    candidate_profiles_dict: Dict[
+        str, List[CandidateProfile]
+    ] = await process_applications_and_cvs(application_docs, cvs_docs, score_weights)
+    sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]] = await asyncify(
+        sort_candidates
+    )(candidate_profiles_dict)
     await render_ranking(sorted_candidate_profiles_dict, source_document_dict)
 
 
-
 async def render_ranking(
-        sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]],
-        source_document_dict: Dict[str, Document]
-    ):
-    
+    sorted_candidate_profiles_dict: Dict[str, List[CandidateProfile]],
+    source_document_dict: Dict[str, Document],
+):
     for jd_source, sorted_candidate_profiles in sorted_candidate_profiles_dict.items():
         doc = source_document_dict[jd_source]
         await display_uploaded_job_description(doc)
@@ -98,8 +111,9 @@ async def render_ranking(
         await render_breakdown(sorted_candidate_profiles, breakdown_msg_id)
 
 
-
-async def render_breakdown(sorted_candidate_profiles: List[CandidateProfile], breakdown_msg_id: str):
+async def render_breakdown(
+    sorted_candidate_profiles: List[CandidateProfile], breakdown_msg_id: str
+):
     for profile in sorted_candidate_profiles:
         skills = profile.matched_skills_profile
         await render_pdf(profile, breakdown_msg_id)
@@ -117,13 +131,15 @@ async def process_applications_and_cvs(
     application_docs: List[Document],
     cvs_docs: List[Document],
     score_weights: ScoreWeightsJson,
-) -> Dict[str,List[CandidateProfile]]:
+) -> Dict[str, List[CandidateProfile]]:
     await cl.Message(content=f"{len(cvs_docs)} CV(s) uploaded.").send()
     jd_cv_result_matrix = {}
     for current_application_doc in application_docs:
         candidate_profiles: List[
             CandidateProfile
-        ] = await process_job_description_and_candidates(current_application_doc, cvs_docs)
+        ] = await process_job_description_and_candidates(
+            current_application_doc, cvs_docs
+        )
         scored_profiles = []
         if len(candidate_profiles) > 0:
             logger.warn("%d profiles extracted", len(candidate_profiles))
@@ -137,7 +153,9 @@ async def process_applications_and_cvs(
                     scored_profiles.append(profile)
         else:
             logger.warn("No profiles extracted")
-        jd_cv_result_matrix[Path(current_application_doc.metadata['source']).name] = candidate_profiles
+        jd_cv_result_matrix[
+            Path(current_application_doc.metadata["source"]).name
+        ] = candidate_profiles
     return jd_cv_result_matrix
 
 
@@ -171,8 +189,12 @@ async def process_job_description_and_candidates(
     profile_llm_chain = create_match_profile_chain_pydantic()
     social_profile_llm_chain = create_social_profile_chain()
 
-    _, skill_results = await process_skills_llm_chain(input_list, profile_llm_chain, sources)
-    _, social_skill_results = await process_social_skills_llm_chain(input_list, social_profile_llm_chain, sources)
+    _, skill_results = await process_skills_llm_chain(
+        input_list, profile_llm_chain, sources
+    )
+    _, social_skill_results = await process_social_skills_llm_chain(
+        input_list, social_profile_llm_chain, sources
+    )
     education_results = await process_career_llm_chain(input_list, sources)
 
     extracted_profiles: List[CandidateProfile] = []
@@ -193,15 +215,15 @@ async def process_job_description_and_candidates(
             continue
 
         logger.info("Matching skills: %a", match_skills_profile)
-        
+
         # Process social skills
         social_kills = extract_social_skills(social_skill_result)
-        
+
         # Process career
         education_career_dict = None
-        if 'function' in education_result:
+        if "function" in education_result:
             education_career_dict: dict = education_result["function"]
-        elif 'relevant_job_list' in education_result:
+        elif "relevant_job_list" in education_result:
             education_career_dict: dict = education_result
         if education_career_dict is None:
             continue
@@ -233,32 +255,39 @@ async def process_job_description_and_candidates(
         ).send()
     return extracted_profiles
 
+
 async def process_career_llm_chain(input_list, sources) -> dict:
-    
     education_llm_chain = create_education_chain()
     education_results_msg = cl.Message(
         content="",
-        prompt=education_llm_chain.prompt.format(job_description="'job description'", cv="'CV'")
+        prompt=education_llm_chain.prompt.format(
+            job_description="'job description'", cv="'CV'"
+        ),
     )
-    await education_results_msg.stream_token("Started career extraction. Please wait ...\n\n")
+    await education_results_msg.stream_token(
+        "Started career extraction. Please wait ...\n\n"
+    )
     education_results = {}
     for input, source in zip(input_list, sources):
         source_name = source.name
         await education_results_msg.stream_token(f"Processing {source_name}.\n\n")
-        education_results[source] = await education_llm_chain.arun(
-            input
-        )
+        education_results[source] = await education_llm_chain.arun(input)
     await education_results_msg.stream_token("Finished career extraction\n\n")
     await education_results_msg.send()
     return education_results
 
 
-async def process_generic_extraction(input_list: List[str], llm_chain: LLMChain, sources: List[str], parameters: dict, task_name: str) -> Tuple[cl.Message, dict]:
-    results_msg = cl.Message(
-        content="",
-        prompt=llm_chain.prompt.format(**parameters)
+async def process_generic_extraction(
+    input_list: List[str],
+    llm_chain: LLMChain,
+    sources: List[str],
+    parameters: dict,
+    task_name: str,
+) -> Tuple[cl.Message, dict]:
+    results_msg = cl.Message(content="", prompt=llm_chain.prompt.format(**parameters))
+    await results_msg.stream_token(
+        f"Started {task_name} extraction. Please wait ...\n\n"
     )
-    await results_msg.stream_token(f"Started {task_name} extraction. Please wait ...\n\n")
     results = {}
     for input, source in zip(input_list, sources):
         source_name = source.name
@@ -270,12 +299,24 @@ async def process_generic_extraction(input_list: List[str], llm_chain: LLMChain,
     return results_msg, results
 
 
-async def process_skills_llm_chain(input_list: List[str], profile_llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
-    return await process_generic_extraction(input_list, profile_llm_chain, sources, {'job_description': "'job description'", 'cv':"'CV'"}, 'skill')
+async def process_skills_llm_chain(
+    input_list: List[str], profile_llm_chain: LLMChain, sources: List[str]
+) -> Tuple[cl.Message, dict]:
+    return await process_generic_extraction(
+        input_list,
+        profile_llm_chain,
+        sources,
+        {"job_description": "'job description'", "cv": "'CV'"},
+        "technical skill",
+    )
 
 
-async def process_social_skills_llm_chain(input_list: List[str], llm_chain: LLMChain, sources: List[str]) -> Tuple[cl.Message, dict]:
-    return await process_generic_extraction(input_list, llm_chain, sources, {'cv':"'CV'"}, 'social skill')
+async def process_social_skills_llm_chain(
+    input_list: List[str], llm_chain: LLMChain, sources: List[str]
+) -> Tuple[cl.Message, dict]:
+    return await process_generic_extraction(
+        input_list, llm_chain, sources, {"cv": "'CV'"}, "social skill"
+    )
 
 
 def extract_sources_input_list(
@@ -305,7 +346,9 @@ async def render_skills(match_skills_profile: MatchSkillsProfileJson, msg_id: st
     await cl.Message(content=social_skills, author=LLM_AUTHOR, parent_id=msg_id).send()
 
 
-async def render_education(education_career: EducationCareerJson, breakdown_msg_id: str):
+async def render_education(
+    education_career: EducationCareerJson, breakdown_msg_id: str
+):
     try:
         relevant_degree_list = education_career.relevant_degree_list
         degree_output = convert_list_to_markdown(relevant_degree_list)
@@ -331,7 +374,9 @@ async def render_education(education_career: EducationCareerJson, breakdown_msg_
 - Relevant degrees: {len(relevant_degree_list)}
 {years_of_experience}
 """
-            msg_id = await cl.Message(content=summary, author=LLM_AUTHOR, parent_id=breakdown_msg_id).send()
+            msg_id = await cl.Message(
+                content=summary, author=LLM_AUTHOR, parent_id=breakdown_msg_id
+            ).send()
             await cl.Message(
                 content=detailed_output, author=LLM_AUTHOR, parent_id=msg_id
             ).send()
@@ -343,18 +388,18 @@ async def render_pdf(candidate_profile: CandidateProfile, breakdown_msg_id: str)
     source = candidate_profile.source
     path = Path(source)
     if path.exists():
-        elements = [
-            cl.Pdf(name=path.stem, display="inline", path=str(path.absolute()))
-        ]
+        elements = [cl.Pdf(name=path.stem, display="inline", path=str(path.absolute()))]
         await cl.Message(
-            content=f"#### {path.name}", 
-            author=HR_ASSISTANT, 
+            content=f"#### {path.name}",
+            author=HR_ASSISTANT,
             parent_id=breakdown_msg_id,
-            elements=elements
+            elements=elements,
         ).send()
 
 
-async def render_scoring(match_skills_profile: MatchSkillsProfileJson, breakdown_msg_id: str):
+async def render_scoring(
+    match_skills_profile: MatchSkillsProfileJson, breakdown_msg_id: str
+):
     matching_skills_count = len(match_skills_profile.matching_skills)
     missing_skills_count = len(match_skills_profile.missing_skills)
     social_skills_count = len(match_skills_profile.social_skills)
@@ -364,7 +409,9 @@ async def render_scoring(match_skills_profile: MatchSkillsProfileJson, breakdown
 - Missing skills: {missing_skills_count}
 - Social skills: {social_skills_count}
 """
-    return await cl.Message(content=message, author=LLM_AUTHOR, parent_id=breakdown_msg_id).send()
+    return await cl.Message(
+        content=message, author=LLM_AUTHOR, parent_id=breakdown_msg_id
+    ).send()
 
 
 async def render_score(profile: CandidateProfile, breakdown_msg_id: str):
@@ -373,7 +420,9 @@ async def render_score(profile: CandidateProfile, breakdown_msg_id: str):
 - **{profile.score}**
 - {profile.breakdown}
 """
-    return await cl.Message(content=message, author=LLM_AUTHOR, parent_id=breakdown_msg_id).send()
+    return await cl.Message(
+        content=message, author=LLM_AUTHOR, parent_id=breakdown_msg_id
+    ).send()
 
 
 def render_skills_str(title: str, skills: List[Dict]) -> str:
@@ -381,7 +430,6 @@ def render_skills_str(title: str, skills: List[Dict]) -> str:
     for matching_skill in skills:
         matching_skill_str += f"\n- {matching_skill}"
     return matching_skill_str
-
 
 
 async def start_process_applications_and_cvs(
@@ -401,6 +449,3 @@ async def start_process_applications_and_cvs(
             settings = await chat_settings.send()
             break
     await process_with_settings(settings)
-
-
-
