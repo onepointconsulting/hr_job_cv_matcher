@@ -32,7 +32,7 @@ class MatchSkillsProfileJson(dict):
             content = result['function']
             matching_skills = content['matching_skills']
             missing_skills = content['missing_skills']
-            social_skills = content['social_skills']
+            social_skills = content.get('social_skills', [])
             return cls(matching_skills, missing_skills, social_skills)
         logger.warn("Cannot parse dict: %s", result)
         return None

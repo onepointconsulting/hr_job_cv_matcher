@@ -1,5 +1,5 @@
 from typing import List, Dict, Callable
-from hr_job_cv_matcher.service.document_matcher import create_input_list
+from hr_job_cv_matcher.service.job_description_cv_matcher import create_input_list
 
 
 def process_multiple_cvs(job_description: str, cvs: List[str], llm_chain_func: Callable) -> List[Dict]:

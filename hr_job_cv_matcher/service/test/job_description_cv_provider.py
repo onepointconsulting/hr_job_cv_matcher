@@ -1,3 +1,9 @@
+import requests
+
+from hr_job_cv_matcher.config import cfg
+from hr_job_cv_matcher.log_init import logger
+
+
 CV = f"""Proficient and creative WordPress developer with a 2+ years of experience in 
 software development. I have worked on back-end management systems 
 including content management and e-commerce. The projects based on PHP 
@@ -70,3 +76,40 @@ def job_description_cv_provider():
     
     cvs = [CV]
     return job_description, cvs
+
+
+def app_support_analyst_provider():
+    return job_description_cv_provider_query('PUNE_JD2023-02_IN.007-App-Support-Analyst.pdf')
+
+
+def web_developer_provider():
+    return job_description_cv_provider_query('CutShort-resume-l6CL.pdf')
+
+
+
+def job_description_cv_provider_2():
+    job_description = app_support_analyst_provider()
+    cvs = [web_developer_provider()]
+    return job_description, cvs
+
+def job_description_cv_provider_query(file_name: str) -> str:
+    remote_pdf_server = cfg.remote_pdf_server.replace("/upload", "")
+    resume_res = requests.get(f"{remote_pdf_server}/cached_file/{file_name}")
+    resume_json = resume_res.json()
+    if 'code' in resume_json and resume_json['code'] == 'OK':
+        logger.info("Request successful")
+        if 'extracted_text' in resume_json:
+            return resume_json['extracted_text']
+    else:
+        logger.info("Request res: %s", dir(resume_json))
+
+
+
+if __name__ == "__main__":
+    res = app_support_analyst_provider()
+    lines = res.split("\n")
+    for line in lines:
+        if "itil" in line.lower():
+            logger.info(line)
+    res = web_developer_provider()
+    logger.info("\n".join(res.split("\n")[:8]))
