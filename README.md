@@ -22,6 +22,30 @@ pip install poetry
 poetry install
 ```
 
+## Configuration
+
+You will need to have a .env file with the following system variables:
+
+```bash
+OPENAI_API_KEY=<open api key>
+# OPENAI_MODEL=gpt-3.5-turbo-0613
+OPENAI_MODEL=gpt-4-0613
+# See https://github.com/gilfernandes/pdf_to_image_server.git which gives you a simple server to convert PDF to images and then extract the text with OCR.
+REMOTE_PDF_SERVER=http://176.34.128.143:8086/upload
+# Temp document location
+TEMP_DOC_LOCATION=/tmp/hr_job_cv_matcher
+# Maximum job description files that you can upload
+MAX_JD_FILES=5
+# Maximum CV files that you can upload
+MAX_CV_FILES=20
+# The LangChain request timeout
+REQUEST_TIMEOUT=120
+# Whether the prompts are printed in the logs or not
+VERBOSE_LLM=true
+# Whether the Langchain cache is to be used or not
+LANGCHAIN_CACHE=false
+```
+
 ## Running
 
 ```
