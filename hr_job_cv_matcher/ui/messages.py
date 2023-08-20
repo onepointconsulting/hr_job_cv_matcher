@@ -19,7 +19,7 @@ async def display_uploaded_job_description(application_doc: Document):
         )
     ]
     await cl.Message(
-        content=f"Processing: **{application_path.name}**",
+        content=f"Processed: **{application_path.name}**",
         elements=elements,
     ).send()
 
