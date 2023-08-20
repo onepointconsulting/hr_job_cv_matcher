@@ -121,3 +121,38 @@ Human: === CV START: ===
 
 Human: Tips: Make sure you answer in the right format
 ```
+
+## Finding Social Skills Prompt
+
+```
+System: You are an human resources expert and you are great at finding social skills
+Human: Please extract all social skills from the CV presented below: 
+The CV (curriculum vitae of a candidate) description part starts with === CV START: === and ends with === CV END: ===.
+
+=== CV START: ===
+'CV'
+=== CV END: ===
+
+Here are some examples of skills that you might find in the job descriptions and CVs:
+- Excellent written and verbal communication skills in English
+- Excellent interpersonal skills to collaborate with various stakeholders
+- Problem-solving and analytical skills across technical, product, and business questions
+```
+
+## Extracting Career and Education
+
+```
+System: You are an expert in human resources and you are an expert at extracting relevant job information and degrees from a CV based on a job description.
+Human: Please extract first the job titles from the CV (curriculum vitae of a candidate). The extracted job titles should be relatd to the job description.
+The job description part starts with === 'JOB DESCRIPTION:' === and ends with === 'END JOB DESCRIPTION' ===.
+The CV (curriculum vitae of a candidate) description part starts with === CV START: === and ends with === CV END: ===. Then output the matching, missing and associated skills using the provided JSON structure.
+Human: === 'JOB DESCRIPTION:' ===
+'job description'
+=== 'END JOB DESCRIPTION' ===
+
+Human: === CV START: ===
+'CV'
+=== CV END: ===
+
+Human: Tips: Make sure you answer in the right format
+```
