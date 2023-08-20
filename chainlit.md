@@ -3,6 +3,9 @@
 ## HR Job CV Assistant
 
 The "HR Job Application CV Matching Assistant" is here to help you to match candidates to multiple job applications and rank the CVs! 
+
+You can upload multiple job applications and CVs and it will match the CVs to each of the uploaded job applications.
+
 👋 We're excited to have you on board!
 
 ## Useful Links 🔗
