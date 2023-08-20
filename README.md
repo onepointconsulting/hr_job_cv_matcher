@@ -48,6 +48,10 @@ VERBOSE_LLM=true
 LANGCHAIN_CACHE=false
 ```
 
+## Dependency on external project
+
+You will need to have a server running this software too: https://github.com/gilfernandes/pdf_to_image_server.git
+
 ## Running
 
 ```
