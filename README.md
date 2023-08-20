@@ -10,6 +10,8 @@ This project works best with ChatGPT 4 that can extract at the time of this writ
 
 ## Setup
 
+We suggest to use [https://docs.conda.io/en/latest/](Conda) to manage the virtual environment.
+
 ```
 conda create -n hr_job_cv_matcher  python=3.11
 conda activate hr_job_cv_matcher
